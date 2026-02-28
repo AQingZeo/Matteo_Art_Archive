@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react'
 
-interface Transform {
+export interface Transform {
   x: number
   y: number
   scale: number
@@ -177,5 +177,33 @@ export function usePanZoom() {
     apply()
   }, [apply])
 
-  return { containerRef, contentRef, zoom, pan, reset, centerContent }
+  const animRef = useRef(0)
+
+  const animateTo = useCallback(
+    (target: Transform, duration = 400, onComplete?: () => void) => {
+      cancelAnimationFrame(animRef.current)
+      const start = { ...t.current }
+      const t0 = performance.now()
+      const step = () => {
+        const elapsed = performance.now() - t0
+        const p = Math.min(1, elapsed / duration)
+        const ease = 1 - (1 - p) * (1 - p)
+        t.current.x = start.x + (target.x - start.x) * ease
+        t.current.y = start.y + (target.y - start.y) * ease
+        t.current.scale = start.scale + (target.scale - start.scale) * ease
+        apply()
+        if (p < 1) {
+          animRef.current = requestAnimationFrame(step)
+        } else {
+          onComplete?.()
+        }
+      }
+      animRef.current = requestAnimationFrame(step)
+    },
+    [apply],
+  )
+
+  const getTransform = useCallback(() => ({ ...t.current }), [])
+
+  return { containerRef, contentRef, zoom, pan, reset, centerContent, animateTo, getTransform }
 }

@@ -98,8 +98,8 @@ export function useMediaPipeGestures({
     let lastPinchReleaseTime = 0
     let smoothPinchDist: number | null = null
 
-    const DPINCH_DOWN_DIST = 0.06
-    const DPINCH_UP_DIST = 0.12
+    const DPINCH_DOWN_DIST = 0.07
+    const DPINCH_UP_DIST = 0.14
     const DPINCH_ALPHA = 0.25
     const DPINCH_WINDOW_MS = 500
     const DPINCH_MIN_SPREAD = 0.13
@@ -131,6 +131,8 @@ export function useMediaPipeGestures({
         const dy = smoothCentroid.y - prevSmooth.y
         cursorPos.x += -dx * w * CURSOR_SPEED
         cursorPos.y += dy * h * CURSOR_SPEED
+        cursorPos.x = Math.max(0, Math.min(w, cursorPos.x))
+        cursorPos.y = Math.max(0, Math.min(h, cursorPos.y))
       } else if (cursorPos === null) {
         cursorPos = { x: w / 2, y: h / 2 }
       }
@@ -368,9 +370,9 @@ export function useMediaPipeGestures({
         spreadResetFired = false
         prevSmooth = null
 
-        const { w, h } = getContainerSize()
-        cursorPos = { x: w / 2, y: h / 2 }
-        onCursorMoveRef.current?.(cursorPos.x, cursorPos.y, 'idle')
+        if (cursorPos) {
+          onCursorMoveRef.current?.(cursorPos.x, cursorPos.y, 'idle')
+        }
       }
 
       raf = requestAnimationFrame(detect)
