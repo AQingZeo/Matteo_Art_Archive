@@ -1,7 +1,13 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react'
 import type { Section } from '@/types/section'
 
 interface ScreenRect { x: number; y: number; w: number; h: number }
+
+export interface FlipSurfaceHandle {
+  startDrag: (localX: number, localY: number) => void
+  moveDrag: (localX: number, localY: number) => void
+  endDrag: () => void
+}
 
 interface FlipSurfaceProps {
   section: Section
@@ -12,6 +18,8 @@ interface FlipSurfaceProps {
 const MAX_CLAMP = 0.15
 const SNAP_THRESHOLD = 0.45
 const SPRING_MS = 400
+/** When flip progress passes this, onFlipComplete fires and section image is hidden */
+const FLIP_HIDE_THRESHOLD = 0.65
 
 /* ── Fold-line x+y=c intersected with a rectangle ── */
 
@@ -169,7 +177,8 @@ function paintCurl(
 
 /* ── Component ── */
 
-export function FlipSurface({ section, screenRect, onFlipComplete }: FlipSurfaceProps) {
+export const FlipSurface = forwardRef<FlipSurfaceHandle, FlipSurfaceProps>(
+  function FlipSurface({ section, screenRect, onFlipComplete }, ref) {
   const { w, h } = screenRect
   const padL = h
   const padT = w
@@ -183,8 +192,17 @@ export function FlipSurface({ section, screenRect, onFlipComplete }: FlipSurface
   const startPt = useRef({ x: 0, y: 0 })
   const startProg = useRef(0)
   const animRef = useRef(0)
+  const flipCompleteFiredRef = useRef(false)
   const cbRef = useRef(onFlipComplete)
   cbRef.current = onFlipComplete
+
+  const maybeFireFlipComplete = useCallback(() => {
+    if (flipCompleteFiredRef.current) return
+    if (progRef.current >= FLIP_HIDE_THRESHOLD) {
+      flipCompleteFiredRef.current = true
+      cbRef.current?.()
+    }
+  }, [])
   const wRef = useRef(w); wRef.current = w
   const hRef = useRef(h); hRef.current = h
   const padLRef = useRef(padL); padLRef.current = padL
@@ -229,41 +247,68 @@ export function FlipSurface({ section, screenRect, onFlipComplete }: FlipSurface
       const eased = 1 - Math.pow(1 - frac, 3)
       progRef.current = start + (target - start) * eased
       paint()
+      maybeFireFlipComplete()
       if (frac < 1) {
         animRef.current = requestAnimationFrame(tick)
-      } else if (target >= 1) {
-        setTimeout(() => cbRef.current?.(), 50)
       }
     }
     animRef.current = requestAnimationFrame(tick)
-  }, [paint])
+  }, [paint, maybeFireFlipComplete])
 
-  const onDown = useCallback((e: React.PointerEvent) => {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    if ((e.clientX - r.left) / r.width < 0.5 || (e.clientY - r.top) / r.height < 0.5) return
+  const beginDrag = useCallback((x: number, y: number) => {
     cancelAnimationFrame(animRef.current)
     dragRef.current = true
-    startPt.current = { x: e.clientX, y: e.clientY }
+    startPt.current = { x, y }
     startProg.current = progRef.current
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }, [])
 
-  const onMove = useCallback((e: React.PointerEvent) => {
+  const updateDrag = useCallback((x: number, y: number) => {
     if (!dragRef.current) return
-    const dx = startPt.current.x - e.clientX
-    const dy = startPt.current.y - e.clientY
+    const dx = startPt.current.x - x
+    const dy = startPt.current.y - y
     let p = startProg.current + (dx + dy) / diag
     p = section.has3D ? Math.max(0, Math.min(1, p)) : Math.max(0, Math.min(MAX_CLAMP, p))
     progRef.current = p
     paint()
-  }, [diag, section.has3D, paint])
+    maybeFireFlipComplete()
+  }, [diag, section.has3D, paint, maybeFireFlipComplete])
 
-  const onUp = useCallback(() => {
+  const finishDrag = useCallback(() => {
     if (!dragRef.current) return
     dragRef.current = false
     if (!section.has3D) springTo(0)
     else springTo(progRef.current >= SNAP_THRESHOLD ? 1 : 0)
   }, [section.has3D, springTo])
+
+  useImperativeHandle(ref, () => ({
+    startDrag(localX: number, localY: number) {
+      if (localX / w < 0.5 || localY / h < 0.5) return
+      beginDrag(localX, localY)
+    },
+    moveDrag(localX: number, localY: number) {
+      updateDrag(localX, localY)
+    },
+    endDrag() {
+      finishDrag()
+    },
+  }), [w, h, beginDrag, updateDrag, finishDrag])
+
+  const onDown = useCallback((e: React.PointerEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const lx = e.clientX - r.left
+    const ly = e.clientY - r.top
+    if (lx / r.width < 0.5 || ly / r.height < 0.5) return
+    beginDrag(e.clientX, e.clientY)
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }, [beginDrag])
+
+  const onMove = useCallback((e: React.PointerEvent) => {
+    updateDrag(e.clientX, e.clientY)
+  }, [updateDrag])
+
+  const onUp = useCallback(() => {
+    finishDrag()
+  }, [finishDrag])
 
   return (
     <div
@@ -293,4 +338,4 @@ export function FlipSurface({ section, screenRect, onFlipComplete }: FlipSurface
       />
     </div>
   )
-}
+})

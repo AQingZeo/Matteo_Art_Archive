@@ -4,8 +4,10 @@ import { useMediaPipeGestures, type CursorState } from '@/hooks/useMediaPipeGest
 import { useHeadZoom } from '@/hooks/useHeadZoom'
 import { SECTIONS } from '@/data/sections'
 import { generateDissolveMap, renderDissolveMask } from '@/lib/dissolve'
-import { FlipSurface } from '@/components/FlipSurface'
+import { FlipSurface, type FlipSurfaceHandle } from '@/components/FlipSurface'
+import { BoxScene } from '@/components/BoxScene'
 import { IntroDissolveContext } from '@/app/AppLayout'
+import type { BoxSceneHandle } from '@/lib/boxScene'
 import type { Section } from '@/types/section'
 
 type Phase = 'exploring' | 'zooming' | 'transitioning' | 'section'
@@ -51,12 +53,23 @@ export function MapCanvas() {
   const cursorRef = useRef<HTMLDivElement>(null)
   const cursorStateRef = useRef<CursorState>('hidden')
   const headResetRef = useRef<() => void>(() => {})
+  const boxSceneRef = useRef<BoxSceneHandle | null>(null)
+  const flipRef = useRef<FlipSurfaceHandle | null>(null)
+  const cursorPosRef = useRef({ x: 0, y: 0 })
+  const cursorSensitivityRef = useRef(1)
+  const cutoutDragActiveRef = useRef(false)
+  const sectionViewRef = useRef<HTMLDivElement>(null)
+  const pinchDragEnabledRef = useRef(false)
 
   const [phase, setPhase] = useState<Phase>('exploring')
   const [focused, setFocused] = useState<Section | null>(null)
   const [sectionScreenRect, setSectionScreenRect] = useState<{
     x: number; y: number; w: number; h: number
   } | null>(null)
+  const [flipCompleted, setFlipCompleted] = useState(false)
+
+  cursorSensitivityRef.current = phase === 'section' ? 0.85 : 1
+  pinchDragEnabledRef.current = phase === 'section'
 
   const dissolveMapRef = useRef<Float32Array | null>(null)
   const dissolveCvsRef = useRef<HTMLCanvasElement | null>(null)
@@ -169,6 +182,7 @@ export function MapCanvas() {
     setPhase('exploring')
     setFocused(null)
     setSectionScreenRect(null)
+    setFlipCompleted(false)
     const el = contentRef.current
     if (el) {
       el.style.maskImage = ''
@@ -177,6 +191,10 @@ export function MapCanvas() {
     reset()
     headResetRef.current()
   }, [reset, contentRef])
+
+  const handleFlipComplete = useCallback(() => {
+    setFlipCompleted(true)
+  }, [])
 
   const handleSelect = useCallback(
     (screenX: number, screenY: number) => {
@@ -200,13 +218,64 @@ export function MapCanvas() {
     [containerRef, zoom, phase],
   )
 
+  const cursorToViewport = useCallback((cx: number, cy: number) => {
+    const el = containerRef.current
+    if (!el) return { x: cx, y: cy }
+    const r = el.getBoundingClientRect()
+    return { x: r.left + cx, y: r.top + cy }
+  }, [])
+
+  const handleDragStart = useCallback(
+    (x: number, y: number) => {
+      if (phase !== 'section') return
+      cursorPosRef.current = { x, y }
+      const { x: screenX, y: screenY } = cursorToViewport(x, y)
+      const cutoutIndex = boxSceneRef.current?.pickCutoutAt(screenX, screenY) ?? null
+      if (cutoutIndex !== null) {
+        cutoutDragActiveRef.current = true
+        boxSceneRef.current?.startDragCutout(cutoutIndex)
+        return
+      }
+      if (flipRef.current && sectionScreenRect) {
+        flipRef.current.startDrag(x - sectionScreenRect.x, y - sectionScreenRect.y)
+      }
+    },
+    [phase, sectionScreenRect, cursorToViewport],
+  )
+
   const handleDrag = useCallback(
     (dx: number, dy: number) => {
-      if (phase !== 'exploring') return
-      pan(dx, dy)
+      if (phase === 'exploring') {
+        pan(dx, dy)
+        return
+      }
+      if (phase === 'section') {
+        const { x: cx, y: cy } = cursorPosRef.current
+        if (cutoutDragActiveRef.current) {
+          const { x: screenX, y: screenY } = cursorToViewport(cx, cy)
+          boxSceneRef.current?.moveDragCutout(screenX, screenY)
+          return
+        }
+        if (flipRef.current && sectionScreenRect) {
+          flipRef.current.moveDrag(cx - sectionScreenRect.x, cy - sectionScreenRect.y)
+        }
+      }
     },
-    [pan, phase],
+    [pan, phase, sectionScreenRect, cursorToViewport],
   )
+
+  const handleDragEnd = useCallback(() => {
+    if (phase === 'section') {
+      if (cutoutDragActiveRef.current) {
+        cutoutDragActiveRef.current = false
+        boxSceneRef.current?.endDragCutout()
+        return
+      }
+      if (flipRef.current) {
+        flipRef.current.endDrag()
+      }
+    }
+  }, [phase])
 
   const handleDoubleTap = useCallback(
     (x: number, y: number) => {
@@ -229,7 +298,46 @@ export function MapCanvas() {
     }
   }, [phase, reset, backToMap])
 
+  const handleSectionPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (phase !== 'section' || !flipCompleted || !sectionViewRef.current) return
+      const cutoutIndex = boxSceneRef.current?.pickCutoutAt(e.clientX, e.clientY) ?? null
+      if (cutoutIndex !== null) {
+        e.preventDefault()
+        cutoutDragActiveRef.current = true
+        boxSceneRef.current?.startDragCutout(cutoutIndex)
+        sectionViewRef.current.setPointerCapture(e.pointerId)
+      }
+    },
+    [phase, flipCompleted],
+  )
+
+  const handleSectionPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (cutoutDragActiveRef.current) {
+        boxSceneRef.current?.moveDragCutout(e.clientX, e.clientY)
+      }
+    },
+    [],
+  )
+
+  const handleSectionPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (cutoutDragActiveRef.current) {
+        cutoutDragActiveRef.current = false
+        boxSceneRef.current?.endDragCutout()
+        sectionViewRef.current?.releasePointerCapture(e.pointerId)
+      }
+    },
+    [],
+  )
+
   const handleCursorMove = useCallback((x: number, y: number, state: CursorState) => {
+    cursorPosRef.current = { x, y }
+    if (phase === 'section') {
+      const { x: screenX, y: screenY } = cursorToViewport(x, y)
+      boxSceneRef.current?.setCursorPosition(screenX, screenY)
+    }
     const el = cursorRef.current
     if (!el) return
     cursorStateRef.current = state
@@ -240,7 +348,7 @@ export function MapCanvas() {
     el.style.opacity = '1'
     el.style.transform = `translate(${x}px, ${y}px)`
     el.dataset.state = state
-  }, [])
+  }, [phase, cursorToViewport])
 
   const handleHeadZoom = useCallback(
     (factor: number) => {
@@ -251,6 +359,15 @@ export function MapCanvas() {
       zoom(factor, r.width / 2, r.height / 2)
     },
     [containerRef, zoom, phase],
+  )
+
+  const handleHeadParallax = useCallback(
+    (dx: number, dy: number) => {
+      if (phase === 'section') {
+        boxSceneRef.current?.setCameraOffset(dx, dy)
+      }
+    },
+    [phase],
   )
 
   const handleDblClick = useCallback(
@@ -265,16 +382,21 @@ export function MapCanvas() {
 
   const { canvasRef: handCanvasRef } = useMediaPipeGestures({
     onZoom: handleGestureZoom,
+    onDragStart: handleDragStart,
     onDrag: handleDrag,
+    onDragEnd: handleDragEnd,
     onDoubleTap: handleDoubleTap,
     onReset: handleReset,
     onCursorMove: handleCursorMove,
     containerRef,
+    cursorSensitivityRef,
+    pinchDragEnabledRef,
     enabled: gestures,
   })
 
   const { canvasRef: faceCanvasRef, resetBaseline: resetHeadBaseline } = useHeadZoom({
     onZoom: handleHeadZoom,
+    onParallax: handleHeadParallax,
     enabled: headZoom,
   })
   headResetRef.current = resetHeadBaseline
@@ -289,7 +411,14 @@ export function MapCanvas() {
     >
       {/* Section view — mounted behind the master during transition, stays for section phase */}
       {(phase === 'transitioning' || phase === 'section') && focused && sectionScreenRect && (
-        <div className="section-view">
+        <div
+          ref={sectionViewRef}
+          className="section-view"
+          onPointerDown={handleSectionPointerDown}
+          onPointerMove={handleSectionPointerMove}
+          onPointerUp={handleSectionPointerUp}
+          onPointerCancel={handleSectionPointerUp}
+        >
           {phase === 'transitioning' && (
             <img
               src={focused.cropSrc}
@@ -307,10 +436,19 @@ export function MapCanvas() {
           )}
           {phase === 'section' && (
             <>
-              <FlipSurface
+              <BoxScene
                 section={focused}
                 screenRect={sectionScreenRect}
+                sceneRef={boxSceneRef}
               />
+              {!flipCompleted && (
+                <FlipSurface
+                  ref={flipRef}
+                  section={focused}
+                  screenRect={sectionScreenRect}
+                  onFlipComplete={handleFlipComplete}
+                />
+              )}
               <button
                 type="button"
                 className="section-back-btn"
@@ -359,7 +497,7 @@ export function MapCanvas() {
         </>
       )}
 
-      {headZoom && phase !== 'section' && (
+      {headZoom && (
         <canvas ref={faceCanvasRef} className="face-preview" />
       )}
 

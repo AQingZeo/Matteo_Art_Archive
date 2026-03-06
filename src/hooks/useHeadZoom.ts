@@ -4,6 +4,7 @@ import type { FaceLandmarker } from '@mediapipe/tasks-vision'
 
 interface Options {
   onZoom: (factor: number) => void
+  onParallax?: (dx: number, dy: number) => void
   enabled?: boolean
 }
 
@@ -19,19 +20,31 @@ interface Options {
  *   5. Deadzone: ignore ratios very close to 1.0
  *   6. Sensitivity scales the deviation from 1.0
  */
-export function useHeadZoom({ onZoom, enabled = true }: Options) {
+// World-unit range so at full head tilt the bottom can shift to the visual edge of the top opening
+const PARALLAX_RANGE = 2.2
+const PARALLAX_ALPHA = 0.12
+// When face is lost, hold parallax and decay to zero over this ms to prevent glitch
+const PARALLAX_LOST_HOLD_MS = 350
+
+export function useHeadZoom({ onZoom, onParallax, enabled = true }: Options) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const onZoomRef = useRef(onZoom)
   onZoomRef.current = onZoom
+  const onParallaxRef = useRef(onParallax)
+  onParallaxRef.current = onParallax
 
   const smoothAreaRef = useRef<number | null>(null)
   const prevAreaRef = useRef<number | null>(null)
   const warmupRef = useRef(0)
+  const smoothCxRef = useRef<number | null>(null)
+  const smoothCyRef = useRef<number | null>(null)
 
   const resetBaseline = useCallback(() => {
     smoothAreaRef.current = null
     prevAreaRef.current = null
     warmupRef.current = 0
+    smoothCxRef.current = null
+    smoothCyRef.current = null
   }, [])
 
   useEffect(() => {
@@ -46,6 +59,12 @@ export function useHeadZoom({ onZoom, enabled = true }: Options) {
     smoothAreaRef.current = null
     prevAreaRef.current = null
     warmupRef.current = 0
+    smoothCxRef.current = null
+    smoothCyRef.current = null
+
+    let lastParallaxDx = 0
+    let lastParallaxDy = 0
+    let faceLostAt: number | null = null
 
     const AREA_ALPHA = 0.08
     const DEADZONE = 0.006
@@ -116,10 +135,45 @@ export function useHeadZoom({ onZoom, enabled = true }: Options) {
         }
 
         prevAreaRef.current = smoothAreaRef.current
+
+        // Parallax: face bbox center offset → camera XY
+        let fMinX = 1, fMaxX = 0, fMinY = 1, fMaxY = 0
+        for (const pt of faceLm) {
+          if (pt.x < fMinX) fMinX = pt.x
+          if (pt.x > fMaxX) fMaxX = pt.x
+          if (pt.y < fMinY) fMinY = pt.y
+          if (pt.y > fMaxY) fMaxY = pt.y
+        }
+        const cx = (fMinX + fMaxX) / 2
+        const cy = (fMinY + fMaxY) / 2
+        if (smoothCxRef.current === null) {
+          smoothCxRef.current = cx
+          smoothCyRef.current = cy
+        } else {
+          smoothCxRef.current += PARALLAX_ALPHA * (cx - smoothCxRef.current)
+          smoothCyRef.current! += PARALLAX_ALPHA * (cy - smoothCyRef.current!)
+        }
+        const dx = (0.5 - smoothCxRef.current) * PARALLAX_RANGE
+        const dy = (smoothCyRef.current! - 0.5) * PARALLAX_RANGE
+        lastParallaxDx = dx
+        lastParallaxDy = dy
+        faceLostAt = null
+        onParallaxRef.current?.(dx, dy)
       } else {
         smoothAreaRef.current = null
         prevAreaRef.current = null
         warmupRef.current = 0
+        smoothCxRef.current = null
+        smoothCyRef.current = null
+        const now = performance.now()
+        if (faceLostAt === null) faceLostAt = now
+        const elapsed = now - faceLostAt
+        if (elapsed >= PARALLAX_LOST_HOLD_MS) {
+          onParallaxRef.current?.(0, 0)
+        } else {
+          const factor = 1 - elapsed / PARALLAX_LOST_HOLD_MS
+          onParallaxRef.current?.(lastParallaxDx * factor, lastParallaxDy * factor)
+        }
       }
 
       raf = requestAnimationFrame(detect)
