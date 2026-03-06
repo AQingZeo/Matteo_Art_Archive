@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState, useEffect } from 'react'
+import { useCallback, useRef, useState, useEffect, useContext } from 'react'
 import { usePanZoom, type Transform } from '@/hooks/usePanZoom'
 import { useMediaPipeGestures, type CursorState } from '@/hooks/useMediaPipeGestures'
 import { useHeadZoom } from '@/hooks/useHeadZoom'
 import { SECTIONS } from '@/data/sections'
 import { generateDissolveMap, renderDissolveMask } from '@/lib/dissolve'
+import { FlipSurface } from '@/components/FlipSurface'
+import { IntroDissolveContext } from '@/app/AppLayout'
 import type { Section } from '@/types/section'
 
 type Phase = 'exploring' | 'zooming' | 'transitioning' | 'section'
@@ -38,6 +40,7 @@ function hitTestSection(
 }
 
 export function MapCanvas() {
+  const introDissolve = useContext(IntroDissolveContext)
   const {
     containerRef, contentRef, zoom, pan, reset,
     centerContent, animateTo, getTransform,
@@ -61,6 +64,46 @@ export function MapCanvas() {
   if (!dissolveCvsRef.current && typeof document !== 'undefined') {
     dissolveCvsRef.current = document.createElement('canvas')
   }
+
+  const introRunning = useRef(false)
+  useEffect(() => {
+    if (!introDissolve || introRunning.current) return
+    introRunning.current = true
+
+    const el = contentRef.current
+    const map = dissolveMapRef.current
+    const cvs = dissolveCvsRef.current
+    if (!el || !map || !cvs) return
+
+    const duration = 1400
+    const t0 = performance.now()
+    let raf = 0
+    const step = () => {
+      const p = 1 - Math.min(1, (performance.now() - t0) / duration)
+      const maskUrl = renderDissolveMask(map, cvs, p)
+      el.style.maskImage = `url(${maskUrl})`
+      el.style.maskSize = '100% 100%'
+      el.style.webkitMaskImage = `url(${maskUrl})`
+      el.style.webkitMaskSize = '100% 100%'
+
+      if (p > 0) {
+        raf = requestAnimationFrame(step)
+      } else {
+        el.style.maskImage = ''
+        el.style.webkitMaskImage = ''
+        introRunning.current = false
+      }
+    }
+    raf = requestAnimationFrame(step)
+    return () => {
+      cancelAnimationFrame(raf)
+      if (el) {
+        el.style.maskImage = ''
+        el.style.webkitMaskImage = ''
+      }
+      introRunning.current = false
+    }
+  }, [introDissolve, contentRef])
 
   const selectSection = useCallback(
     (s: Section) => {
@@ -247,27 +290,35 @@ export function MapCanvas() {
       {/* Section view — mounted behind the master during transition, stays for section phase */}
       {(phase === 'transitioning' || phase === 'section') && focused && sectionScreenRect && (
         <div className="section-view">
-          <img
-            src={focused.cropSrc}
-            alt={focused.id}
-            className="section-image-placed"
-            draggable={false}
-            style={{
-              position: 'absolute',
-              left: sectionScreenRect.x,
-              top: sectionScreenRect.y,
-              width: sectionScreenRect.w,
-              height: sectionScreenRect.h,
-            }}
-          />
+          {phase === 'transitioning' && (
+            <img
+              src={focused.cropSrc}
+              alt={focused.id}
+              className="section-image-placed"
+              draggable={false}
+              style={{
+                position: 'absolute',
+                left: sectionScreenRect.x,
+                top: sectionScreenRect.y,
+                width: sectionScreenRect.w,
+                height: sectionScreenRect.h,
+              }}
+            />
+          )}
           {phase === 'section' && (
-            <button
-              type="button"
-              className="section-back-btn"
-              onClick={backToMap}
-            >
-              Back to map
-            </button>
+            <>
+              <FlipSurface
+                section={focused}
+                screenRect={sectionScreenRect}
+              />
+              <button
+                type="button"
+                className="section-back-btn"
+                onClick={backToMap}
+              >
+                Back to map
+              </button>
+            </>
           )}
         </div>
       )}
@@ -279,7 +330,7 @@ export function MapCanvas() {
           className="map-content"
         >
           <img
-            src="/test.png"
+            src="/alphabetMap.png"
             alt=""
             className="master-image"
             draggable={false}

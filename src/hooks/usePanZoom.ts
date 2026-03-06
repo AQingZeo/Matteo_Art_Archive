@@ -6,15 +6,16 @@ export interface Transform {
   scale: number
 }
 
-const MIN_SCALE = 1
 const MAX_SCALE = 20
 const WHEEL_FACTOR = 0.002
+const FIT_RATIO = 0.85
 
 export function usePanZoom() {
   const containerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const t = useRef<Transform>({ x: 0, y: 0, scale: 1 })
   const home = useRef<Transform>({ x: 0, y: 0, scale: 1 })
+  const minScale = useRef(0.01)
   const dragging = useRef(false)
   const lastPt = useRef({ x: 0, y: 0 })
 
@@ -35,9 +36,11 @@ export function usePanZoom() {
     const w = img.naturalWidth || img.clientWidth
     const h = img.naturalHeight || img.clientHeight
     if (!w || !h) return
-    const cx = (cRect.width - w) / 2
-    const cy = (cRect.height - h) / 2
-    home.current = { x: cx, y: cy, scale: 1 }
+    const fitScale = Math.min(cRect.width / w, cRect.height / h) * FIT_RATIO
+    const cx = (cRect.width - w * fitScale) / 2
+    const cy = (cRect.height - h * fitScale) / 2
+    minScale.current = fitScale
+    home.current = { x: cx, y: cy, scale: fitScale }
     t.current = { ...home.current }
     apply()
   }, [apply])
@@ -45,7 +48,7 @@ export function usePanZoom() {
   const zoom = useCallback(
     (factor: number, cx: number, cy: number) => {
       const cur = t.current
-      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, cur.scale * factor))
+      const next = Math.min(MAX_SCALE, Math.max(minScale.current, cur.scale * factor))
       const r = next / cur.scale
       cur.x = cx - (cx - cur.x) * r
       cur.y = cy - (cy - cur.y) * r
@@ -91,7 +94,6 @@ export function usePanZoom() {
 
     // Touch: single-finger pan, two-finger pinch zoom
     let lastTouchDist = 0
-    let lastTouchMid = { x: 0, y: 0 }
 
     const touchDist = (a: Touch, b: Touch) =>
       Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
@@ -103,11 +105,6 @@ export function usePanZoom() {
       } else if (e.touches.length === 2) {
         dragging.current = false
         lastTouchDist = touchDist(e.touches[0], e.touches[1])
-        const rect = c.getBoundingClientRect()
-        lastTouchMid = {
-          x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
-          y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
-        }
       }
     }
 
@@ -131,7 +128,6 @@ export function usePanZoom() {
           zoom(d / lastTouchDist, mid.x, mid.y)
         }
         lastTouchDist = d
-        lastTouchMid = mid
       }
     }
 
@@ -148,9 +144,6 @@ export function usePanZoom() {
     c.addEventListener('touchstart', onTouchStart, { passive: true })
     c.addEventListener('touchmove', onTouchMove, { passive: false })
     c.addEventListener('touchend', onTouchEnd)
-
-    // suppress mid-touch on lastTouchMid
-    void lastTouchMid
 
     return () => {
       c.removeEventListener('wheel', onWheel)

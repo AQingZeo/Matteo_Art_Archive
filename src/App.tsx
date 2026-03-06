@@ -9,6 +9,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<MainMapPage />} />
+          <Route path="map" element={<MainMapPage />} />
           <Route path="section/:id" element={<SectionPage />} />
         </Route>
       </Routes>

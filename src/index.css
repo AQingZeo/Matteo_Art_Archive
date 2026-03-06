@@ -7,12 +7,83 @@ html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #1a1a1a;
+  background: #FFF8F2;
 }
 
 .app-layout {
   width: 100%;
   height: 100%;
+  position: relative;
+}
+
+/* ── Landing page ── */
+
+.landing-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #FFF8F2;
+  overflow: hidden;
+}
+
+.landing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+}
+
+.landing-image-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+
+.landing-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.landing-hotspot {
+  position: absolute;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  outline: none;
+  z-index: 2;
+}
+.landing-hotspot:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.3);
+  outline-offset: 2px;
+}
+
+.landing-zoom-out {
+  animation: landingZoom 800ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes landingZoom {
+  to {
+    transform: scale(3.5);
+    opacity: 0;
+  }
+}
+
+/* ── Floating decorations layer ── */
+
+.floating-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.floating-item {
+  pointer-events: none;
+}
+
+.floating-placeholder {
+  border-radius: 50%;
+  background: rgba(80, 120, 180, 0.35);
 }
 
 /* ── Main map page ── */
@@ -183,6 +254,7 @@ html, body, #root {
   position: absolute;
   inset: 0;
   background: #1a1a1a;
+  overflow: visible;
 }
 .section-image-placed {
   display: block;
@@ -200,7 +272,24 @@ html, body, #root {
   border-radius: 20px;
   cursor: pointer;
   transition: background 200ms;
+  z-index: 10;
 }
 .section-back-btn:hover {
   background: rgba(0, 0, 0, 0.6);
+}
+
+/* ── Flip surface (canvas page-curl) ── */
+
+.flip-surface {
+  z-index: 1;
+  cursor: grab;
+  touch-action: none;
+  overflow: visible;
+}
+.flip-surface:active {
+  cursor: grabbing;
+}
+.flip-canvas {
+  display: block;
+  pointer-events: none;
 }

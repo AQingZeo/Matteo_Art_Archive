@@ -93,16 +93,6 @@ export function minTipDistance(landmarks: Point2D[]): number {
   return min
 }
 
-/** Min distance from thumb tip (4) to each of index(8), middle(12), ring(16), pinky(20) */
-export function thumbToFingersMinDist(landmarks: Point2D[]): number {
-  const thumb = landmarks[4]
-  let min = Infinity
-  for (const idx of [8, 12, 16, 20]) {
-    min = Math.min(min, pinchDistance(thumb, landmarks[idx]))
-  }
-  return min
-}
-
 /** Min distance from thumb tip (4) to index(8) or middle(12) — used for pinch detection */
 export function thumbPinchMinDist(landmarks: Point2D[]): number {
   const thumb = landmarks[4]

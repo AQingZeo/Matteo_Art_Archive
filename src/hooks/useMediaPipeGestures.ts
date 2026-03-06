@@ -63,20 +63,6 @@ export function useMediaPipeGestures({
     let landmarker: HandLandmarker | null = null
     let cancelled = false
 
-    // ── Zoom state (temporarily disabled) ──
-    // let zoomActive = false
-    // let smoothDist: number | null = null
-    // let prevSmoothDist: number | null = null
-    // let smoothFactor = 1.0
-    // const ACTIVATE_DIST = 0.10
-    // const DEACTIVATE_DIST = 0.30
-    // const DIST_ALPHA = 0.18
-    // const FACTOR_ALPHA = 0.25
-    // const SENSITIVITY = 2.2
-    // const DEADZONE = 0.0008
-    // const IDLE_SNAP = 0.0003
-    const zoomActive = false
-
     // ── Grasp state ──
     let graspActive = false
     let smoothGraspDist: number | null = null
@@ -177,9 +163,7 @@ export function useMediaPipeGestures({
               ctx.fill()
             }
 
-            ctx.strokeStyle = zoomActive
-              ? 'rgba(100,255,100,0.7)'
-              : 'rgba(255,255,255,0.35)'
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)'
             ctx.lineWidth = 2
             ctx.beginPath()
             ctx.moveTo(lm[4].x * w, lm[4].y * h)
@@ -263,7 +247,7 @@ export function useMediaPipeGestures({
         // ─── 0. Spread + shake reset detection (highest priority) ───
         // ALL 5 fingertips must be far from each other (min pairwise > threshold)
         const isSpread = smoothAllMinDist > SPREAD_ALL_MIN_DIST
-        if (isSpread && !graspActive && !zoomActive) {
+        if (isSpread && !graspActive) {
           cursorState = 'spread'
 
           shakeBuf.push(centroid.x)

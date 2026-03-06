@@ -1,13 +1,34 @@
-import { Outlet } from 'react-router-dom'
+import { createContext, useCallback, useRef, useState } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { LandingOverlay } from '@/pages/LandingPage'
 
-/**
- * Root layout. Single container for SPA; no full reloads.
- * Optional: wrap with global state (state machine) provider.
- */
+export const IntroDissolveContext = createContext(false)
+
+const TRANSITION_MS = 1600
+
 export function AppLayout() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [showLanding, setShowLanding] = useState(location.pathname === '/')
+  const [introDissolve, setIntroDissolve] = useState(false)
+  const timerRef = useRef(0)
+
+  const onLandingEnter = useCallback(() => {
+    setIntroDissolve(true)
+    clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => {
+      setShowLanding(false)
+      setIntroDissolve(false)
+      if (location.pathname === '/') navigate('/map', { replace: true })
+    }, TRANSITION_MS)
+  }, [navigate, location.pathname])
+
   return (
     <div className="app-layout">
-      <Outlet />
+      <IntroDissolveContext.Provider value={introDissolve}>
+        <Outlet />
+      </IntroDissolveContext.Provider>
+      {showLanding && <LandingOverlay onEnter={onLandingEnter} />}
     </div>
   )
 }
