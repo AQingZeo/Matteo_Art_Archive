@@ -5,15 +5,26 @@ import { LandingOverlay } from '@/pages/LandingPage'
 export const IntroDissolveContext = createContext(false)
 
 const TRANSITION_MS = 1600
-const BGM_VOLUME = 0.15
+const BGM_VOLUME = 0.3
+/** Viewport width below this is treated as phone (MediaPipe not supported). */
+const PHONE_BREAKPOINT_PX = 768
 
 export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [showLanding, setShowLanding] = useState(location.pathname === '/')
   const [introDissolve, setIntroDissolve] = useState(false)
+  const [isPhone, setIsPhone] = useState(() => typeof window !== 'undefined' && window.innerWidth < PHONE_BREAKPOINT_PX)
+  const [phoneBannerDismissed, setPhoneBannerDismissed] = useState(false)
   const timerRef = useRef(0)
   const bgmRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    const check = () => setIsPhone(window.innerWidth < PHONE_BREAKPOINT_PX)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     const audio = new Audio('/abcSong.m4a')
@@ -58,6 +69,21 @@ export function AppLayout() {
 
   return (
     <div className="app-layout">
+      {isPhone && !phoneBannerDismissed && (
+        <div className="phone-notice" role="status">
+          <p className="phone-notice-text">
+            This site uses MediaPipe and currently doesn’t work on phones. Please use a tablet or desktop.
+          </p>
+          <button
+            type="button"
+            className="phone-notice-dismiss"
+            aria-label="Dismiss"
+            onClick={() => setPhoneBannerDismissed(true)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <IntroDissolveContext.Provider value={introDissolve}>
         <Outlet />
       </IntroDissolveContext.Provider>

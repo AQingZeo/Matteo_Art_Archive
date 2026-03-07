@@ -542,7 +542,7 @@ export function MapCanvas() {
             <>
               <span className="hint-line"><span className="hint-dot hint-yellow" />Fingers together / fist → pan</span>
               <span className="hint-line"><span className="hint-dot hint-red" />Double pinch → select</span>
-              <span className="hint-line"><span className="hint-dot hint-blue" />Open hand → reset</span>
+              <span className="hint-line"><span className="hint-dot hint-blue" />Open hand move→ reset</span>
             </>
           ) : (
             <>
