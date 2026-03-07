@@ -7,13 +7,25 @@ html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #FFF8F2;
+  background: #eee5d6;
 }
 
 .app-layout {
   width: 100%;
   height: 100%;
   position: relative;
+  background: #eee5d6;
+}
+.app-layout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('/texture.jpg');
+  background-repeat: repeat;
+  background-size: 400px auto;
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
 
 /* ── Landing page ── */
@@ -25,11 +37,39 @@ html, body, #root {
   background: #FFF8F2;
   overflow: hidden;
 }
+.landing-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('/texture.jpg');
+  background-repeat: repeat;
+  background-size: 400px auto;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
 
 .landing-overlay {
   position: absolute;
   inset: 0;
   z-index: 50;
+}
+
+.landing-zoom-wrap {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.landing-face-canvas {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .landing-image-wrapper {
@@ -43,6 +83,7 @@ html, body, #root {
   display: block;
   width: 100%;
   height: auto;
+  filter: brightness(1.15);
 }
 
 .landing-hotspot {
@@ -66,6 +107,13 @@ html, body, #root {
     transform: scale(3.5);
     opacity: 0;
   }
+}
+
+.landing-head-fade {
+  animation: landingHeadFade 600ms ease-out forwards;
+}
+@keyframes landingHeadFade {
+  to { opacity: 0; }
 }
 
 /* ── Floating decorations layer ── */
@@ -101,6 +149,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   position: relative;
+  z-index: 1;
   touch-action: none;
   user-select: none;
 }
@@ -117,6 +166,7 @@ html, body, #root {
   display: block;
   max-width: none;
   pointer-events: none;
+  filter: brightness(1.15);
 }
 
 /* ── Camera preview (MediaPipe overlay) ── */
@@ -253,12 +303,13 @@ html, body, #root {
 .section-view {
   position: absolute;
   inset: 0;
-  background: #FFF8F2;
+  background: transparent;
   overflow: visible;
 }
 .section-image-placed {
   display: block;
   object-fit: fill;
+  filter: brightness(1.15);
 }
 .section-back-btn {
   position: absolute;
@@ -284,9 +335,13 @@ html, body, #root {
   z-index: 0;
   overflow: hidden;
   border-radius: 2px;
+  max-width: none;
+  max-height: none;
 }
 .box-scene canvas {
   display: block;
+  max-width: none;
+  max-height: none;
 }
 
 /* ── Flip surface (canvas page-curl) ── */
@@ -303,4 +358,5 @@ html, body, #root {
 .flip-canvas {
   display: block;
   pointer-events: none;
+  filter: brightness(1.15);
 }

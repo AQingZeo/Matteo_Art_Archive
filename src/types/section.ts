@@ -29,6 +29,5 @@ export interface Section {
   cropSrc: string
   has3D: boolean
   modelSrc?: string
-  /** Cutout images placed inside the box (with physics). */
-  cutouts?: CutoutItem[]
+  /** Cutouts are loaded from public/{id}/ (all images {id}-1.png, {id}-2.png, …). */
 }

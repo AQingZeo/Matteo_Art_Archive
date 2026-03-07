@@ -13,7 +13,12 @@ export function AppLayout() {
   const [introDissolve, setIntroDissolve] = useState(false)
   const timerRef = useRef(0)
 
-  const onLandingEnter = useCallback(() => {
+  const onLandingEnter = useCallback((options?: { skipTransition?: boolean }) => {
+    if (options?.skipTransition) {
+      setShowLanding(false)
+      if (location.pathname === '/') navigate('/map', { replace: true })
+      return
+    }
     setIntroDissolve(true)
     clearTimeout(timerRef.current)
     timerRef.current = window.setTimeout(() => {

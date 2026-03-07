@@ -6,16 +6,6 @@ export const SECTIONS: Section[] = [
     rect: { x: 28, y: 31, width: 450, height: 417 },
     cropSrc: '/sections/section-a.png',
     has3D: true,
-    cutouts: [
-      {
-        id: 'cutout-1',
-        image: 'section-a-1.png',
-        width: 0.5,
-        height: 0.45,
-        position: { x: 0, y: 0.02, z: 0 },
-        rotationY: 0,
-      },
-    ],
   },
   {
     id: 'section-b',

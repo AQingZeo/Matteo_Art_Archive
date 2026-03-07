@@ -151,16 +151,14 @@ function paintCurl(
     ctx.restore()
   }
 
-  /* 3. Folded portion — reflected across x+y=c, clipped to extended
+  /* 3. Folded portion — back of card (white), reflected across x+y=c, clipped to extended
    *    flat polygon so the overhang past image bounds is visible. */
   if (extFlatPoly.length >= 3) {
     ctx.save()
     clipPoly(ctx, extFlatPoly)
-    const dim = 1 - (0.06 + progress * 0.05)
-    ctx.filter = `brightness(${dim.toFixed(3)})`
     ctx.transform(0, -1, -1, 0, c, c)
-    ctx.drawImage(img, 0, 0, w, h)
-    ctx.filter = 'none'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
     ctx.restore()
   }
 

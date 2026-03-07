@@ -66,6 +66,7 @@ export function MapCanvas() {
   const [sectionScreenRect, setSectionScreenRect] = useState<{
     x: number; y: number; w: number; h: number
   } | null>(null)
+  const [sectionViewSize, setSectionViewSize] = useState<{ w: number; h: number } | null>(null)
   const [flipCompleted, setFlipCompleted] = useState(false)
 
   cursorSensitivityRef.current = phase === 'section' ? 0.85 : 1
@@ -134,6 +135,7 @@ export function MapCanvas() {
         w: sw,
         h: sh,
       })
+      setSectionViewSize({ w: r.width, h: r.height })
 
       setFocused(s)
       setPhase('zooming')
@@ -178,10 +180,28 @@ export function MapCanvas() {
     }
   }, [phase, contentRef])
 
+  useEffect(() => {
+    if ((phase !== 'section' && phase !== 'transitioning') || !sectionScreenRect) return
+    // Prefer section-view element so box scene matches section view; fallback to map canvas
+    const el = sectionViewRef.current ?? containerRef.current
+    if (!el) return
+    const update = () => {
+      const r = el.getBoundingClientRect()
+      setSectionViewSize((prev) =>
+        prev?.w === r.width && prev?.h === r.height ? prev : { w: r.width, h: r.height },
+      )
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [phase, sectionScreenRect])
+
   const backToMap = useCallback(() => {
     setPhase('exploring')
     setFocused(null)
     setSectionScreenRect(null)
+    setSectionViewSize(null)
     setFlipCompleted(false)
     const el = contentRef.current
     if (el) {
@@ -438,7 +458,25 @@ export function MapCanvas() {
             <>
               <BoxScene
                 section={focused}
-                screenRect={sectionScreenRect}
+                screenRect={
+                  (() => {
+                    if (sectionViewSize && typeof window !== 'undefined') {
+                      const vp = window.visualViewport
+                      const vw = vp ? vp.width : window.innerWidth
+                      const vh = vp ? vp.height : window.innerHeight
+                      return { x: 0, y: 0, w: vw, h: vh }
+                    }
+                    if (sectionViewSize) {
+                      return { x: 0, y: 0, w: sectionViewSize.w, h: sectionViewSize.h }
+                    }
+                    return sectionScreenRect!
+                  })()
+                }
+                boxAspect={
+                  sectionViewSize
+                    ? sectionScreenRect.w / sectionScreenRect.h
+                    : undefined
+                }
                 sceneRef={boxSceneRef}
               />
               {!flipCompleted && (
