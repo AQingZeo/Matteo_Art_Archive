@@ -48,8 +48,7 @@ export function MapCanvas() {
     centerContent, animateTo, getTransform,
   } = usePanZoom()
 
-  const [gestures, setGestures] = useState(false)
-  const [headZoom, setHeadZoom] = useState(false)
+  const [cameraOn, setCameraOn] = useState(true)
   const cursorRef = useRef<HTMLDivElement>(null)
   const cursorStateRef = useRef<CursorState>('hidden')
   const headResetRef = useRef<() => void>(() => {})
@@ -411,13 +410,13 @@ export function MapCanvas() {
     containerRef,
     cursorSensitivityRef,
     pinchDragEnabledRef,
-    enabled: gestures,
+    enabled: cameraOn,
   })
 
   const { canvasRef: faceCanvasRef, resetBaseline: resetHeadBaseline } = useHeadZoom({
     onZoom: handleHeadZoom,
     onParallax: handleHeadParallax,
-    enabled: headZoom,
+    enabled: cameraOn,
   })
   headResetRef.current = resetHeadBaseline
 
@@ -491,8 +490,9 @@ export function MapCanvas() {
                 type="button"
                 className="section-back-btn"
                 onClick={backToMap}
+                aria-label="Back to map"
               >
-                Back to map
+                <img src="/utility/backBTN.png" alt="Back to map" draggable={false} />
               </button>
             </>
           )}
@@ -528,38 +528,43 @@ export function MapCanvas() {
         </div>
       )}
 
-      {gestures && (
+      {cameraOn && (
         <>
           <canvas ref={handCanvasRef} className="camera-preview" />
           <div ref={cursorRef} className="hand-cursor" data-state="hidden" />
+          <canvas ref={faceCanvasRef} className="face-preview" />
         </>
       )}
 
-      {headZoom && (
-        <canvas ref={faceCanvasRef} className="face-preview" />
-      )}
-
       <div className="toggle-group">
+        <div className="control-hints">
+          {cameraOn ? (
+            <>
+              <span className="hint-line"><span className="hint-dot hint-yellow" />Fingers together / fist → pan</span>
+              <span className="hint-line"><span className="hint-dot hint-red" />Double pinch → select</span>
+              <span className="hint-line"><span className="hint-dot hint-blue" />Open hand → reset</span>
+            </>
+          ) : (
+            <>
+              <span className="hint-line">Drag to pan</span>
+              <span className="hint-line">Double-click to enter section</span>
+              <span className="hint-line">Scroll wheel to zoom</span>
+            </>
+          )}
+        </div>
         <button
           type="button"
           className="gesture-toggle"
-          aria-pressed={gestures}
-          aria-label={gestures ? 'Turn off hand gestures' : 'Turn on hand gestures'}
-          onClick={() => setGestures((v) => !v)}
+          aria-pressed={cameraOn}
+          aria-label={cameraOn ? 'Turn off camera' : 'Turn on camera'}
+          onClick={() => setCameraOn((v) => !v)}
         >
-          <span className="gesture-toggle-icon">{gestures ? '\u270B' : '\u2728'}</span>
-          <span className="gesture-toggle-label">{gestures ? 'Hands on' : 'Hands'}</span>
-        </button>
-
-        <button
-          type="button"
-          className="gesture-toggle"
-          aria-pressed={headZoom}
-          aria-label={headZoom ? 'Turn off head zoom' : 'Turn on head zoom'}
-          onClick={() => setHeadZoom((v) => !v)}
-        >
-          <span className="gesture-toggle-icon">{headZoom ? '\uD83D\uDC64' : '\uD83D\uDE10'}</span>
-          <span className="gesture-toggle-label">{headZoom ? 'Head on' : 'Head'}</span>
+          <img
+            src={cameraOn ? '/utility/camera-on.png' : '/utility/camera-off.png'}
+            alt={cameraOn ? 'Camera on' : 'Camera off'}
+            className="gesture-toggle-icon"
+            draggable={false}
+          />
         </button>
       </div>
     </div>

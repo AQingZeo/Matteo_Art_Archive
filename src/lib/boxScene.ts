@@ -606,10 +606,35 @@ export async function createBoxScene(
         (tex) => {
           if (destroyed) return
           tex.colorSpace = THREE.SRGBColorSpace
-          tex.needsUpdate = true
+
+          const srcImg = tex.image as HTMLImageElement
+          const cw = srcImg.naturalWidth || srcImg.width
+          const ch = srcImg.naturalHeight || srcImg.height
+          const cvs = document.createElement('canvas')
+          cvs.width = cw
+          cvs.height = ch
+          const ctx = cvs.getContext('2d')!
+          ctx.drawImage(srcImg, 0, 0)
+
+          const texImg = pageTexture.image as HTMLImageElement
+          if (texImg) {
+            ctx.globalCompositeOperation = 'multiply'
+            const tiles = Math.ceil(Math.max(cw, ch) / TEXTURE_TILE_SIZE) + 1
+            for (let ti = 0; ti < tiles; ti++) {
+              for (let tj = 0; tj < tiles; tj++) {
+                ctx.drawImage(texImg, ti * TEXTURE_TILE_SIZE, tj * TEXTURE_TILE_SIZE, TEXTURE_TILE_SIZE, TEXTURE_TILE_SIZE)
+              }
+            }
+            ctx.globalCompositeOperation = 'destination-in'
+            ctx.drawImage(srcImg, 0, 0)
+          }
+
+          const bakedTex = new THREE.CanvasTexture(cvs)
+          bakedTex.colorSpace = THREE.SRGBColorSpace
+
           const targetMesh = cutoutMeshes[meshIndex]
           if (targetMesh?.material && targetMesh.material instanceof THREE.MeshLambertMaterial) {
-            targetMesh.material.map = tex
+            targetMesh.material.map = bakedTex
             targetMesh.material.needsUpdate = true
           }
         },

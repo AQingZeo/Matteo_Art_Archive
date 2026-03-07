@@ -157,7 +157,7 @@ function paintCurl(
     ctx.save()
     clipPoly(ctx, extFlatPoly)
     ctx.transform(0, -1, -1, 0, c, c)
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = '#cfc7ba'
     ctx.fillRect(0, 0, w, h)
     ctx.restore()
   }

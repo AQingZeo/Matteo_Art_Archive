@@ -1,0 +1,12 @@
+[
+  {
+    "TextID": "LandingGerman",
+    "Quote": "\u201EKunst ist der gespeicherte Honig der menschlichen Seele.\u201C",
+    "QuoteAuthor": "Theodor Dreiser"
+  },
+  {
+    "TextID": "LandingEnglish",
+    "Quote": "\u201CArt is the stored honey of the human soul.\u201D",
+    "QuoteAuthor": "Theodor Dreiser"
+  }
+]

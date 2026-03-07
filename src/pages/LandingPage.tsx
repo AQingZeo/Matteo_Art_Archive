@@ -1,13 +1,17 @@
 import { useRef, useCallback, useState, useLayoutEffect, useEffect } from 'react'
 import { FloatingDecorations } from '@/components/FloatingDecorations'
 import { useHeadZoom } from '@/hooks/useHeadZoom'
+import textData from '@/data/text.json'
+
+const germanQuote = textData.find(t => t.TextID === 'LandingGerman')!
+const englishQuote = textData.find(t => t.TextID === 'LandingEnglish')!
 
 const HOTSPOT = { left: 0.6, top: 0.45, width: 0.2, height: 0.4 }
 const HOTSPOT_CENTER_X = HOTSPOT.left + HOTSPOT.width / 2
 const HOTSPOT_CENTER_Y = HOTSPOT.top + HOTSPOT.height / 2
 const LANDING_MAX_SCALE = 4
 /** When head zoom reaches this scale (hotspot ~70% of screen), advance to main without transition. */
-const ENTER_ZOOM_THRESHOLD = 3.5
+const ENTER_ZOOM_THRESHOLD = 2.2
 
 interface LandingOverlayProps {
   onEnter: (options?: { skipTransition?: boolean }) => void
@@ -92,6 +96,16 @@ export function LandingOverlay({ onEnter }: LandingOverlayProps) {
           transform: `scale(${scale})`,
         }}
       >
+        <div className="landing-quote">
+          <blockquote className="landing-quote-de">
+            {germanQuote.Quote}
+          </blockquote>
+          <blockquote className="landing-quote-en">
+            {englishQuote.Quote}
+          </blockquote>
+          <span className="landing-quote-author">— {germanQuote.QuoteAuthor}</span>
+        </div>
+
         <div ref={wrapperRef} className="landing-image-wrapper">
           <img
             src="/landing.png"
@@ -112,10 +126,14 @@ export function LandingOverlay({ onEnter }: LandingOverlayProps) {
               width: `${HOTSPOT.width * 100}%`,
               height: `${HOTSPOT.height * 100}%`,
             }}
-          />
+          >
+            <span className="landing-hotspot-label">Look closer</span>
+          </div>
         </div>
 
         <FloatingDecorations />
+
+        <span className="landing-art-credit">Art by Matteo Rederer</span>
       </div>
     </div>
   )

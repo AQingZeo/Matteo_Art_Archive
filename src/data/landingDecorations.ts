@@ -60,10 +60,10 @@ function itemForImage(filename: string, index: number): DecorationItem {
     baseY,
     amplitudeX,
     amplitudeY,
-    frequency: 0.2 + (index % 5) * 0.04,
+    frequency: 0.08 + (index % 5) * 0.02,
     phaseOffset: (index / n) * Math.PI * 2,
     imageSrc: `/landingMini/${filename}`,
-    size: '128px',
+    size: '180px',
   }
 }
 
