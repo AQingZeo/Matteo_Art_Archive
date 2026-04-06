@@ -1,8 +1,23 @@
-import { createContext, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LandingOverlay } from '@/pages/LandingPage'
 
 export const IntroDissolveContext = createContext(false)
+
+export type BgmContextValue = {
+  soundOn: boolean
+  setSoundOn: Dispatch<SetStateAction<boolean>>
+}
+
+export const BgmContext = createContext<BgmContextValue | null>(null)
 
 const TRANSITION_MS = 1600
 const BGM_VOLUME = 0.3
@@ -18,6 +33,7 @@ export function AppLayout() {
   const [phoneBannerDismissed, setPhoneBannerDismissed] = useState(false)
   const timerRef = useRef(0)
   const bgmRef = useRef<HTMLAudioElement | null>(null)
+  const [soundOn, setSoundOn] = useState(true)
 
   useEffect(() => {
     const check = () => setIsPhone(window.innerWidth < PHONE_BREAKPOINT_PX)
@@ -52,6 +68,11 @@ export function AppLayout() {
     }
   }, [])
 
+  useEffect(() => {
+    const el = bgmRef.current
+    if (el) el.muted = !soundOn
+  }, [soundOn])
+
   const onLandingEnter = useCallback((options?: { skipTransition?: boolean }) => {
     if (options?.skipTransition) {
       setShowLanding(false)
@@ -85,7 +106,9 @@ export function AppLayout() {
         </div>
       )}
       <IntroDissolveContext.Provider value={introDissolve}>
-        <Outlet />
+        <BgmContext.Provider value={{ soundOn, setSoundOn }}>
+          <Outlet />
+        </BgmContext.Provider>
       </IntroDissolveContext.Provider>
       {showLanding && <LandingOverlay onEnter={onLandingEnter} />}
     </div>

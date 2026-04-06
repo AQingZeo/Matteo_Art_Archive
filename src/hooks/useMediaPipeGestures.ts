@@ -3,6 +3,7 @@ import {
   getHandLandmarker,
   maxTipDistance,
   minTipDistance,
+  thumbIndexPinchDist,
   thumbPinchMinDist,
   tipsCentroid,
   type Point2D,
@@ -100,15 +101,14 @@ export function useMediaPipeGestures({
     const DPINCH_WINDOW_MS = 500
     const DPINCH_MIN_SPREAD = 0.12
 
-    // ── Pinch-drag: thumb+index pinch can drive drag (easier than five-finger grasp on section page)
+    // ── Pinch-drag (section page): cursor at thumb, thumb+index only; pinch = mouse down, release = mouse up (immediate, no hold delay)
     let pinchDragActive = false
-    let pinchHoldStartTime = 0
-    let pinchReleaseConfirmFrames = 0
-    const PINCH_DRAG_DOWN = 0.14
-    const PINCH_DRAG_UP = 0.22
-    const PINCH_DRAG_HOLD_MS = 45
-    const PINCH_DRAG_MOVE_PX = 2
-    const PINCH_DRAG_RELEASE_FRAMES = 3
+    let smoothThumb: Point2D | null = null
+    let smoothThumbIndexDist: number | null = null
+    const THUMB_CURSOR_ALPHA = 0.35
+    const THUMB_INDEX_PINCH_ALPHA = 0.3
+    const PINCH_DRAG_DOWN = 0.10   // thumb+index together → drag
+    const PINCH_DRAG_UP = 0.16    // thumb+index apart → release
 
     // ── Spread-shake reset state ──
     let spreadResetFired = false
@@ -256,6 +256,24 @@ export function useMediaPipeGestures({
           smoothPinchDist += DPINCH_ALPHA * (rawPinchDist - smoothPinchDist)
         }
 
+        // Section page only: smooth thumb position (cursor) and thumb–index distance (pinch = mouse down/up)
+        const pinchDragAllowed = pinchDragEnabledRefStable.current?.current === true
+        if (pinchDragAllowed) {
+          const rawThumbIndexDist = thumbIndexPinchDist(lm)
+          const thumbPos = lm[4]
+          if (smoothThumb === null) {
+            smoothThumb = { x: thumbPos.x, y: thumbPos.y }
+          } else {
+            smoothThumb.x += THUMB_CURSOR_ALPHA * (thumbPos.x - smoothThumb.x)
+            smoothThumb.y += THUMB_CURSOR_ALPHA * (thumbPos.y - smoothThumb.y)
+          }
+          if (smoothThumbIndexDist === null) {
+            smoothThumbIndexDist = rawThumbIndexDist
+          } else {
+            smoothThumbIndexDist += THUMB_INDEX_PINCH_ALPHA * (rawThumbIndexDist - smoothThumbIndexDist)
+          }
+        }
+
         // Smooth min-of-all-pairs distance for spread detection
         if (smoothAllMinDist === null) {
           smoothAllMinDist = rawAllMinDist
@@ -325,25 +343,20 @@ export function useMediaPipeGestures({
           onDragEndRef.current?.()
         }
 
-        // ─── 1b. Pinch-drag (thumb+index pinch → drag, only when enabled e.g. section page; main page uses grasp to pan, pinch = double-tap select) ───
-        const pinchDragAllowed = pinchDragEnabledRefStable.current?.current === true
-        const isPinched = smoothPinchDist !== null && smoothPinchDist < PINCH_DRAG_DOWN
-        const pinchReleased = smoothPinchDist !== null && smoothPinchDist > PINCH_DRAG_UP
+        // ─── 1b. Pinch-drag (section page only: cursor at thumb, thumb+index only; together = mouse down, apart = mouse up, immediate) ───
         const notGrasping = !graspActive && (smoothGraspDist === null || smoothGraspDist > GRASP_ACTIVATE)
+        const isPinched = pinchDragAllowed
+          ? (smoothThumbIndexDist !== null && smoothThumbIndexDist < PINCH_DRAG_DOWN)
+          : (smoothPinchDist !== null && smoothPinchDist < PINCH_DRAG_DOWN)
+        const pinchReleased = pinchDragAllowed
+          ? (smoothThumbIndexDist !== null && smoothThumbIndexDist > PINCH_DRAG_UP)
+          : (smoothPinchDist !== null && smoothPinchDist > PINCH_DRAG_UP)
 
         if (pinchDragAllowed && isPinched && notGrasping && !isSpread && cursorPos) {
-          const now = performance.now()
           if (!pinchDragActive) {
-            if (pinchHoldStartTime === 0) pinchHoldStartTime = now
-            const heldLongEnough = now - pinchHoldStartTime >= PINCH_DRAG_HOLD_MS
-            const movedEnough = prevScreenPos
-              ? Math.hypot(cursorPos.x - prevScreenPos.x, cursorPos.y - prevScreenPos.y) >= PINCH_DRAG_MOVE_PX
-              : false
-            if (heldLongEnough || movedEnough) {
-              pinchDragActive = true
-              prevScreenPos = { ...cursorPos }
-              onDragStartRef.current?.(cursorPos.x, cursorPos.y)
-            }
+            pinchDragActive = true
+            prevScreenPos = { ...cursorPos }
+            onDragStartRef.current?.(cursorPos.x, cursorPos.y)
           }
           if (pinchDragActive) {
             cursorState = 'grasp'
@@ -356,33 +369,24 @@ export function useMediaPipeGestures({
             }
             prevScreenPos = { ...cursorPos }
           }
-        } else {
-          pinchHoldStartTime = 0
         }
         let releaseWasPinchDrag = false
-        if (smoothPinchDist !== null && smoothPinchDist > PINCH_DRAG_UP) {
-          if (pinchDragActive) {
-            pinchReleaseConfirmFrames += 1
-            if (pinchReleaseConfirmFrames >= PINCH_DRAG_RELEASE_FRAMES) {
-              pinchDragActive = false
-              prevScreenPos = null
-              releaseWasPinchDrag = true
-              onDragEndRef.current?.()
-              pinchReleaseConfirmFrames = 0
-            }
-          }
-        } else {
-          pinchReleaseConfirmFrames = 0
+        if (pinchReleased && pinchDragActive) {
+          pinchDragActive = false
+          prevScreenPos = null
+          releaseWasPinchDrag = true
+          onDragEndRef.current?.()
         }
 
         // ─── 2. Double-pinch detection (two quick pinches = tap/click) ───
+        const pinchDistForTap = pinchDragAllowed ? smoothThumbIndexDist : smoothPinchDist
         const isPinchEligible = !graspActive && !pinchDragActive && !isSpread
           && smoothGraspDist !== null && smoothGraspDist > DPINCH_MIN_SPREAD
         if (isPinchEligible) {
-          if (!pinchDown && smoothPinchDist !== null && smoothPinchDist < DPINCH_DOWN_DIST) {
+          if (!pinchDown && pinchDistForTap !== null && pinchDistForTap < DPINCH_DOWN_DIST) {
             pinchDown = true
           }
-          if (pinchDown && smoothPinchDist !== null && smoothPinchDist > DPINCH_UP_DIST) {
+          if (pinchDown && pinchDistForTap !== null && pinchDistForTap > DPINCH_UP_DIST) {
             pinchDown = false
             if (!releaseWasPinchDrag) {
               const now = performance.now()
@@ -402,14 +406,21 @@ export function useMediaPipeGestures({
         } else {
           pinchDown = false
         }
-        if (pinchReleased) {
-          pinchHoldStartTime = 0
-        }
 
         // ─── 3. Hand zoom temporarily disabled ───
 
-        // ─── Update movement-relative cursor and report ───
-        updateCursorPos()
+        // ─── Cursor position: section page = thumb position; main page = movement-relative from centroid ───
+        if (pinchDragAllowed && smoothThumb) {
+          const { w, h } = getContainerSize()
+          // Mirror horizontal axis to match main-map cursor (-Δx on centroid) / selfie-style UX
+          cursorPos = {
+            x: Math.max(0, Math.min(w, (1 - smoothThumb.x) * w)),
+            y: Math.max(0, Math.min(h, smoothThumb.y * h)),
+          }
+          prevSmooth = null
+        } else {
+          updateCursorPos()
+        }
         if (cursorPos) {
           onCursorMoveRef.current?.(cursorPos.x, cursorPos.y, cursorState)
         }
@@ -426,8 +437,8 @@ export function useMediaPipeGestures({
           prevScreenPos = null
           onDragEndRef.current?.()
         }
-        pinchHoldStartTime = 0
-        pinchReleaseConfirmFrames = 0
+        smoothThumb = null
+        smoothThumbIndexDist = null
         smoothGraspDist = null
         smoothCentroid = null
         smoothPinchDist = null

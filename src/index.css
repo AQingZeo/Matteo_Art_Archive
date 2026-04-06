@@ -321,6 +321,15 @@ html, body, #root {
   align-items: flex-end;
 }
 
+.toggle-buttons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 /* ── Control hints ── */
 
 .control-hints {
@@ -373,6 +382,16 @@ html, body, #root {
   height: 96px;
   width: auto;
   display: block;
+}
+.gesture-toggle-icon--svg {
+  width: 96px;
+  height: 96px;
+}
+
+/* Sound toggle: same hit target as camera row but icon is ~1/3 size */
+.gesture-toggle--sound .gesture-toggle-icon--svg {
+  width: 32px;
+  height: 32px;
 }
 
 /* ── Virtual hand cursor ── */

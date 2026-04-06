@@ -6,7 +6,7 @@ import { SECTIONS } from '@/data/sections'
 import { generateDissolveMap, renderDissolveMask } from '@/lib/dissolve'
 import { FlipSurface, type FlipSurfaceHandle } from '@/components/FlipSurface'
 import { BoxScene } from '@/components/BoxScene'
-import { IntroDissolveContext } from '@/app/AppLayout'
+import { BgmContext, IntroDissolveContext } from '@/app/AppLayout'
 import type { BoxSceneHandle } from '@/lib/boxScene'
 import type { Section } from '@/types/section'
 
@@ -41,8 +41,42 @@ function hitTestSection(
   return null
 }
 
+function SoundToggleIcon({ on }: { on: boolean }) {
+  return (
+    <svg
+      className="gesture-toggle-icon gesture-toggle-icon--svg"
+      viewBox="0 0 96 96"
+      aria-hidden
+    >
+      <circle cx="48" cy="48" r="44" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
+      <path
+        fill="rgba(255,255,255,0.92)"
+        d="M26 34h10l14-10v58l-14-10H26V34zm16 8v12l8-6V48l-8-6z"
+      />
+      {on ? (
+        <path
+          fill="none"
+          stroke="rgba(255,255,255,0.92)"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          d="M56 36c7 5 7 19 0 24M62 30c12 8 12 28 0 36"
+        />
+      ) : (
+        <path
+          fill="none"
+          stroke="rgba(255,255,255,0.9)"
+          strokeWidth="4"
+          strokeLinecap="round"
+          d="M56 34L72 62M72 34L56 62"
+        />
+      )}
+    </svg>
+  )
+}
+
 export function MapCanvas() {
   const introDissolve = useContext(IntroDissolveContext)
+  const bgm = useContext(BgmContext)
   const {
     containerRef, contentRef, zoom, pan, reset,
     centerContent, animateTo, getTransform,
@@ -249,17 +283,19 @@ export function MapCanvas() {
       if (phase !== 'section') return
       cursorPosRef.current = { x, y }
       const { x: screenX, y: screenY } = cursorToViewport(x, y)
-      const cutoutIndex = boxSceneRef.current?.pickCutoutAt(screenX, screenY) ?? null
-      if (cutoutIndex !== null) {
-        cutoutDragActiveRef.current = true
-        boxSceneRef.current?.startDragCutout(cutoutIndex)
-        return
+      if (flipCompleted) {
+        const cutoutIndex = boxSceneRef.current?.pickCutoutAt(screenX, screenY) ?? null
+        if (cutoutIndex !== null) {
+          cutoutDragActiveRef.current = true
+          boxSceneRef.current?.startDragCutout(cutoutIndex)
+          return
+        }
       }
       if (flipRef.current && sectionScreenRect) {
         flipRef.current.startDrag(x - sectionScreenRect.x, y - sectionScreenRect.y)
       }
     },
-    [phase, sectionScreenRect, cursorToViewport],
+    [phase, sectionScreenRect, cursorToViewport, flipCompleted],
   )
 
   const handleDrag = useCallback(
@@ -354,8 +390,12 @@ export function MapCanvas() {
   const handleCursorMove = useCallback((x: number, y: number, state: CursorState) => {
     cursorPosRef.current = { x, y }
     if (phase === 'section') {
-      const { x: screenX, y: screenY } = cursorToViewport(x, y)
-      boxSceneRef.current?.setCursorPosition(screenX, screenY)
+      if (flipCompleted) {
+        const { x: screenX, y: screenY } = cursorToViewport(x, y)
+        boxSceneRef.current?.setCursorPosition(screenX, screenY)
+      } else {
+        boxSceneRef.current?.clearCutoutCursorHover()
+      }
     }
     const el = cursorRef.current
     if (!el) return
@@ -367,7 +407,7 @@ export function MapCanvas() {
     el.style.opacity = '1'
     el.style.transform = `translate(${x}px, ${y}px)`
     el.dataset.state = state
-  }, [phase, cursorToViewport])
+  }, [phase, cursorToViewport, flipCompleted])
 
   const handleHeadZoom = useCallback(
     (factor: number) => {
@@ -552,20 +592,33 @@ export function MapCanvas() {
             </>
           )}
         </div>
-        <button
-          type="button"
-          className="gesture-toggle"
-          aria-pressed={cameraOn}
-          aria-label={cameraOn ? 'Turn off camera' : 'Turn on camera'}
-          onClick={() => setCameraOn((v) => !v)}
-        >
-          <img
-            src={cameraOn ? '/utility/camera-on.png' : '/utility/camera-off.png'}
-            alt={cameraOn ? 'Camera on' : 'Camera off'}
-            className="gesture-toggle-icon"
-            draggable={false}
-          />
-        </button>
+        <div className="toggle-buttons">
+          {bgm && (
+            <button
+              type="button"
+              className="gesture-toggle gesture-toggle--sound"
+              aria-pressed={bgm.soundOn}
+              aria-label={bgm.soundOn ? 'Mute background music' : 'Unmute background music'}
+              onClick={() => bgm.setSoundOn((v) => !v)}
+            >
+              <SoundToggleIcon on={bgm.soundOn} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="gesture-toggle"
+            aria-pressed={cameraOn}
+            aria-label={cameraOn ? 'Turn off camera' : 'Turn on camera'}
+            onClick={() => setCameraOn((v) => !v)}
+          >
+            <img
+              src={cameraOn ? '/utility/camera-on.png' : '/utility/camera-off.png'}
+              alt={cameraOn ? 'Camera on' : 'Camera off'}
+              className="gesture-toggle-icon"
+              draggable={false}
+            />
+          </button>
+        </div>
       </div>
     </div>
   )

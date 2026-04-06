@@ -12,6 +12,8 @@ export interface BoxSceneHandle {
   setCameraOffset: (dx: number, dy: number) => void
   resize: (w: number, h: number) => void
   setCursorPosition: (screenX: number, screenY: number) => void
+  /** Stop using cursor for cutout hover (e.g. while section cover is still flipped). */
+  clearCutoutCursorHover: () => void
   pickCutoutAt: (screenX: number, screenY: number) => number | null
   startDragCutout: (index: number) => void
   moveDragCutout: (screenX: number, screenY: number) => void
@@ -723,6 +725,12 @@ export async function createBoxScene(
     lastCursor = { x: screenX, y: screenY }
   }
 
+  function clearCutoutCursorHover() {
+    lastCursor = null
+    hoveredCutoutIndex = null
+    applyHighlight()
+  }
+
   // Offsets in screen px to retry when hand-reported position barely misses the cutout (forgiving pinch pick).
   const PICK_TOLERANCE_PX = 28
   const PICK_OFFSETS: [number, number][] = [
@@ -912,6 +920,7 @@ export async function createBoxScene(
     setCameraOffset,
     resize,
     setCursorPosition,
+    clearCutoutCursorHover,
     pickCutoutAt,
     startDragCutout,
     moveDragCutout,

@@ -102,6 +102,11 @@ export function thumbPinchMinDist(landmarks: Point2D[]): number {
   )
 }
 
+/** Distance from thumb tip (4) to index tip (8) only — for precise pinch-drag on section page */
+export function thumbIndexPinchDist(landmarks: Point2D[]): number {
+  return pinchDistance(landmarks[4], landmarks[8])
+}
+
 export function tipsCentroid(landmarks: Point2D[]): Point2D {
   let sx = 0
   let sy = 0
